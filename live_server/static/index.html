@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AirVLN Live</title>
+  <style id="critical-layout-fallback">
+    /* Keep the app usable if the external theme is delayed during a restart. */
+    :root { color-scheme: dark; }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body { min-height: 100vh; display: grid; grid-template-columns: minmax(320px, 410px) 1fr; color: #ecf4ee; background: #0b1014; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+    button, input, select, textarea { font: inherit; }
+    .panel { min-height: 100vh; padding: 24px; background: #121922; overflow: auto; }
+    .viewer { min-width: 0; min-height: 100vh; padding: 24px; display: grid; grid-template-rows: auto auto auto 1fr auto; gap: 16px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 16px 0; }
+    .topbar, .bevHeader { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+    .frameWrap, .bevPanel { min-width: 0; min-height: 240px; background: #0d171d; border: 1px solid #263442; border-radius: 20px; overflow: hidden; }
+    #stream, #streamCanvas, #replayVideo { display: block; width: 100%; height: auto; min-height: 240px; object-fit: contain; }
+    textarea, input, select { width: 100%; color: #ecf4ee; background: #0d151c; border: 1px solid #344352; border-radius: 10px; padding: 10px; }
+    button { border: 0; border-radius: 10px; padding: 11px 14px; color: #081018; background: #57c99a; font-weight: 700; cursor: pointer; }
+    label { display: grid; gap: 8px; margin: 14px 0; }
+  </style>
+  <link rel="stylesheet" href="/static/style.css?v=20260825-stable82-v58">
+</head>
+<body>
+  <aside class="panel">
+    <div class="brand">
+      <p class="eyebrow">AerialVLN</p>
+      <h1>AirVLN Live</h1>
+      <p class="subtitle">分段语义对齐 + 目标接近可视化</p>
+    </div>
+
+    <label>飞行指令</label>
+    <textarea id="instruction" rows="8">now go over the buildings and get down towards the road</textarea>
+
+    <div class="grid advancedOnly">
+      <label>场景
+        <select id="scene"></select>
+      </label>
+      <label>步数
+        <input id="maxSteps" type="number" min="1" max="900" value="900">
+      </label>
+    </div>
+
+    <label class="advancedOnly">模式
+      <select id="mode">
+        <option value="agent">Agent 在线飞行</option>
+        <option value="scripted">按动作指令飞行</option>
+        <option value="camera">只看实时相机</option>
+      </select>
+    </label>
+
+    <div class="agentFields">
+      <section class="demoBuilder">
+        <div class="demoBuilderHeader">
+          <div>
+            <span class="pill">Scene16 Demo Builder</span>
+            <strong>Scene16 稳定展示池</strong>
+          </div>
+          <small id="demoBuilderSummary">正在加载稳定展示指令族...</small>
+        </div>
+        <label>目标/路线指令族
+          <select id="demoFamily">
+            <option value="">正在加载...</option>
+          </select>
+        </label>
+        <label>稳定种子任务
+          <select id="demoSeed">
+            <option value="">先选择指令族</option>
+          </select>
+        </label>
+        <label>表达方式
+          <select id="demoVariant">
+            <option value="">先选择稳定种子</option>
+          </select>
+          <span id="demoVariantNote" class="fieldHint">原始长指令为严格成功样本；同义变体只做同路线保守改写，不代表任意新指令泛化。</span>
+        </label>
+      </section>
+
+      <label class="advancedOnly">可选飞行指令
+        <select id="datasetEpisode">
+          <option value="">正在加载全部指令...</option>
+        </select>
+        <span id="datasetInstructionCount" class="fieldHint">正在读取当前场景的指令目录</span>
+        <span id="demoCoverageSummary" class="coverageHint">Demo coverage: checking...</span>
+        <span id="selectedQualitySummary" class="qualityHint">Selected quality: -</span>
+        <span id="readinessSummary" class="readinessHint">Readiness: checking...</span>
+      </label>
+      <label class="advancedOnly">Showcase Filter
+        <select id="showcaseFilter">
+          <option value="frontline">FRONT only</option>
+          <option value="live" selected>LIVE-OK only</option>
+          <option value="stable">FRONT + STABLE</option>
+          <option value="all">ALL safe</option>
+        </select>
+      </label>
+      <label class="advancedOnly">Quality Gate
+        <select id="qualityGate">
+          <option value="90">DEMO Q90+</option>
+          <option value="80" selected>STRONG Q80+</option>
+          <option value="70">USABLE Q70+</option>
+          <option value="0">ALL quality</option>
+        </select>
+      </label>
+      <label class="advancedOnly">Episode ID
+        <input id="episodeId" value="304SM51WAC2LJX66KU06PFQOK2ISBK__seg006">
+      </label>
+      <div class="grid advancedOnly">
+        <label>数据划分
+          <select id="split">
+            <option value="train_scene16_segments_high_conf_1k">phase_a_scene16_segments_1k</option>
+            <option value="train_scene16_segments_smoke100">phase_a_scene16_segments_smoke100</option>
+            <option value="train_scene16_segments_high_conf_5k">phase_a_scene16_segments_5k</option>
+            <option value="train" selected>train</option>
+            <option value="val_unseen">val_unseen</option>
+            <option value="val_seen">val_seen</option>
+          </select>
+        </label>
+        <label>模拟器端口
+          <input id="simulatorPort" type="number" min="1" max="65535" value="30014">
+        </label>
+      </div>
+      <label class="advancedOnly">GPU ID
+        <select id="gpuId">
+          <option value="0">GPU 0</option>
+        </select>
+      </label>
+      <label class="advancedOnly">Checkpoint
+        <input id="checkpoint" value="" placeholder="可选：设置 AIRVLN_PHASE_A_CKPT 或输入 checkpoint 路径">
+      </label>
+      <label class="check advancedOnly">
+        <input id="oracleGoalHoming" type="checkbox" checked>
+        启用 Oracle goal homing 诊断模式（使用数据集目标坐标，非公平论文指标）
+      </label>
+      <label class="check advancedOnly">
+        <input id="oraclePathHoming" type="checkbox" checked>
+        启用 Oracle path homing 诊断模式（使用数据集参考航点，非公平论文指标）
+      </label>
+      <label class="check advancedOnly">
+        <input id="learnedSegmentHoming" type="checkbox" checked>
+        启用 Learned segment homing（使用 local20 分段 grounding 模型，不读取 reference_path）
+      </label>
+      <p id="oracleModeNotice" class="notice warn advancedOnly">
+        页面会自动列出当前场景和数据划分中的全部指令；选择后，飞行指令会自动替换为数据集里的原始 instruction。
+        Oracle 诊断使用该 episode 的 goal/reference_path；Learned segment 使用学习到的局部 grounding 目标。
+      </p>
+    </div>
+
+    <label class="check advancedOnly">
+      <input id="confirmControl" type="checkbox" checked>
+      我确认当前 AirSim / Drone_1 可由本系统控制
+    </label>
+
+    <div class="actions">
+      <button id="startBtn">开始</button>
+      <button id="nextDemoBtn">下一条演示</button>
+      <button id="replayBtn">模型回放</button>
+      <button id="stopBtn" disabled>停止</button>
+      <button id="demoDefaultsBtn" class="advancedOnly">演示配置</button>
+      <button id="generalizationPoolBtn" class="advancedOnly">泛化候选</button>
+      <button id="planBtn" class="advancedOnly">预览动作</button>
+    </div>
+
+    <pre id="status">初始化中...</pre>
+  </aside>
+
+  <main class="viewer">
+    <div class="topbar">
+      <span id="badge">idle</span>
+      <span id="liveFps">0 frames</span>
+      <span id="sessionId">session: -</span>
+    </div>
+
+    <section id="metricsPanel" class="metrics">
+      <article>
+        <span>当前距离</span>
+        <strong id="metricDistance">- m</strong>
+      </article>
+      <article>
+        <span>历史最近</span>
+        <strong id="metricBest">- m</strong>
+      </article>
+      <article>
+        <span>20m 成功</span>
+        <strong id="metricSuccess">not within 20m</strong>
+      </article>
+      <article>
+        <span>高度误差</span>
+        <strong id="metricAltitude">- m</strong>
+      </article>
+      <article>
+        <span>实体距离</span>
+        <strong id="metricSurface">- m</strong>
+      </article>
+      <article>
+        <span>阶段</span>
+        <strong id="metricPhase">-</strong>
+      </article>
+      <article>
+        <span>Oracle</span>
+        <strong id="metricOracle">oracle miss</strong>
+      </article>
+      <article>
+        <span>碰撞保护</span>
+        <strong id="metricCollision">collision-free</strong>
+      </article>
+    </section>
+
+    <div class="progressWrap">
+      <div id="goalProgressBar"></div>
+      <span id="goalProgressText">progress -</span>
+    </div>
+
+    <section id="semanticPanel" class="semanticPanel">
+      <div class="semanticHeader">
+        <span>Semantic Alignment</span>
+        <strong id="semanticMatch">waiting</strong>
+      </div>
+      <div class="semanticGrid">
+        <article>
+          <span>当前短指令段</span>
+          <strong id="semanticSegment">-</strong>
+        </article>
+        <article>
+          <span>期望动作</span>
+          <strong id="semanticExpected">-</strong>
+        </article>
+        <article>
+          <span>实际动作</span>
+          <strong id="semanticAction">-</strong>
+        </article>
+        <article>
+          <span>目标实体/区域</span>
+          <strong id="semanticTarget">-</strong>
+        </article>
+      </div>
+    </section>
+
+    <div class="frameWrap">
+      <canvas id="streamCanvas" width="1280" height="720" aria-label="AirSim smooth stream"></canvas>
+      <img id="stream" alt="AirSim stream" decoding="async">
+      <video id="replayVideo" muted playsinline controls preload="auto" disableRemotePlayback></video>
+      <div id="placeholder">等待画面</div>
+    </div>
+
+    <section class="bevPanel">
+      <div class="bevHeader">
+        <span>BEV Route / 20m Success Circle</span>
+        <span id="bevStats">no trajectory</span>
+      </div>
+      <canvas id="bevCanvas" width="1200" height="260"></canvas>
+    </section>
+  </main>
+
+  <script src="/static/app.js?v=20260825-stable82-v58"></script>
+</body>
+</html>
