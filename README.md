@@ -51,6 +51,41 @@ python live_server/app.py --host 127.0.0.1 --port 18080
 
 Open `http://127.0.0.1:18080/`. The simulator and dataset paths are environment-specific; configure them locally rather than committing machine paths.
 
+## Reproduce the optimization workflow
+
+1. Clone this repository and the upstream AerialVLN assets. The simulator package, AerialVLN/AerialVLN-S annotations, and checkpoints are distributed separately by the upstream project.
+
+2. Create the Python 3.8 environment and install dependencies:
+
+```bash
+conda create -n AirVLN-opt python=3.8
+conda activate AirVLN-opt
+pip install -r requirements.txt
+pip install airsim==1.7.0
+```
+
+3. Copy `config.example.env` to `.env` and set the local dataset, checkpoint, stable-pool, and manifest paths. The example values are intentionally placeholders.
+
+4. Start the AirSim scene server with a `preview_0` capture configured to 1280x720. `airsim_plugin/AirVLNSimulatorServerTool.py` can generate the preview capture settings; use `AIRVLN_PREVIEW_CAMERA_WIDTH=1280`, `AIRVLN_PREVIEW_CAMERA_HEIGHT=720`, and `AIRVLN_PREVIEW_CAMERA_MAX_RAW_BYTES=3000000`.
+
+5. Start the demo API with `scripts/run_demo_server.sh`. Verify it with `GET /api/health` and inspect the catalog with `GET /api/scene16/demo-builder?max_seeds_per_family=120`.
+
+6. For an existing successful session, render one deterministic high-resolution replay:
+
+```bash
+python scripts/render_scene16_highres_trace.py \\
+  --session-id <successful-session-id> \\
+  --manifest "$AIRVLN_SCENE16_PREVIEW_MANIFEST" \\
+  --tool-port 30014 \\
+  --skip-existing
+python scripts/validate_highres_replay.py \\
+  live_server/runtime/agent_sessions/<successful-session-id>/replay/replay_h264_highres_8fps.json
+```
+
+7. After validating one trace, render the eligible set with `--all-eligible --skip-existing`. The renderer reuses one Scene16 connection, writes each video atomically before updating its manifest entry, and continues past an individual failure.
+
+The exact published result cannot be regenerated without the original successful traces and licensed simulator assets. To make a result auditable, preserve the manifest, metadata JSON, source trace hash, simulator settings hash, and the output video SHA256 alongside your experiment record.
+
 ## Citation
 
 ```bibtex
