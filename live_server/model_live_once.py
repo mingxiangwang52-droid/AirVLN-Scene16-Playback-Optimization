@@ -959,8 +959,7 @@ def parse_args():
     parser.add_argument(
         "--ckpt",
         default=(
-            "/mnt/nfs/dataset/AirVLN/DATA/output/AirVLN-cma-seg16-1k/train/checkpoint/"
-            "20260701-160924-508467/ckpt.LAST.pth"
+            os.environ.get("AIRVLN_AGENT_CHECKPOINT", "")
         ),
     )
     parser.add_argument("--scene-id", type=int, default=16)
